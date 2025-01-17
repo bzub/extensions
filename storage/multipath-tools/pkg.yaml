@@ -1,0 +1,45 @@
+name: multipath-tools
+variant: scratch
+shell: /toolchain/bin/bash
+dependencies:
+  - stage: base
+  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/lvm2:{{ .BUILD_ARG_PKGS }}"
+  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/systemd-udevd:{{ .BUILD_ARG_PKGS }}"
+  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/libjson-c:{{ .BUILD_ARG_PKGS }}"
+  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/liburcu:{{ .BUILD_ARG_PKGS }}"
+  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/libcap:{{ .BUILD_ARG_PKGS }}"
+  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/libaio:{{ .BUILD_ARG_PKGS }}"
+  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/util-linux:{{ .BUILD_ARG_PKGS }}"
+steps:
+  - sources:
+      - url: https://github.com/opensvc/multipath-tools/archive/refs/tags/{{ .MULTIPATH_TOOLS_VERSION }}.tar.gz
+        destination: multipath-tools.tar.gz
+        sha256: f2e67a1d2167f3945afab6f0697207a03678f5b2bd80f1f45958c6fa1dfb8eef
+        sha512: 8f545609fa20df7547428f2929571dc0df87c17d9f61f11aad3559446c2e94755e18b1c4b3780b3de92ec2cbc450939ca15a9d6c95551eee4084064d83874b2d
+    env:
+      PKG_CONFIG_PATH: /usr/lib/pkgconfig
+    prepare:
+      - |
+        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
+      - |
+        tar -xzf multipath-tools.tar.gz --strip-components=1
+    build:
+      - |
+        make -j $(nproc) SYSTEMD=""
+    install:
+      - |
+        make DESTDIR=/rootfs/usr/local install
+      # - |
+      #   mkdir -p /rootfs/usr/local/sbin
+      #   cp multipath multipathc multipathd mpathpersist kpartx /rootfs/usr/local/sbin/
+    test:
+      - |
+        mkdir -p /extensions-validator-rootfs
+        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
+        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
+        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+finalize:
+  - from: /rootfs
+    to: /rootfs
+  - from: /pkg/manifest.yaml
+    to: /

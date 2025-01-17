@@ -29,6 +29,7 @@ spec:
     - mdadm
     - mei
     - metal-agent
+    - multipath-tools
     - nut-client
     - nvidia-container-toolkit-lts
     - nvidia-container-toolkit-production
