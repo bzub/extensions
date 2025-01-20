@@ -21,17 +21,40 @@ steps:
     prepare:
       - |
         sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
+
       - |
         tar -xzf multipath-tools.tar.gz --strip-components=1
+
+      # This removes a dependency on libgcc
+      - |
+        patch -p1 < /pkg/patches/disable-exception-handling.patch
     build:
       - |
-        make -j $(nproc) SYSTEMD=""
+        make -j $(nproc) prefix=/usr/local SYSTEMD=""
     install:
       - |
-        make DESTDIR=/rootfs/usr/local install
-      # - |
-      #   mkdir -p /rootfs/usr/local/sbin
-      #   cp multipath multipathc multipathd mpathpersist kpartx /rootfs/usr/local/sbin/
+        make prefix=/usr/local DESTDIR=/rootfs install
+      - |
+        mkdir -p /rootfs/usr/local/etc/containers
+        cp /pkg/multipathd.yaml /rootfs/usr/local/etc/containers/
+      - |
+        mkdir -p /rootfs/usr/local/lib/containers/multipathd
+
+      # This file wants to load kernel module `dm-multipath`.
+      # Talos users should load kernel modules via MachineConfig instead.
+      - |
+        rm /rootfs/usr/lib/modules-load.d/multipath.conf
+        rmdir /rootfs/usr/lib/modules-load.d
+
+      # This file tries to create a tmpfs mount at `/var/run/multipath`.
+      # TODO: Probably should do this in the extension service or elsewhere.
+      - |
+        rm /rootfs/usr/lib/tmpfiles.d/multipath.conf
+        rmdir /rootfs/usr/lib/tmpfiles.d
+
+      # TODO: Not sure what to do with this yet.
+      - |
+        rm /rootfs/usr/lib/udev/kpartx_id
     test:
       - |
         mkdir -p /extensions-validator-rootfs
