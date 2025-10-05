@@ -1,6 +1,6 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED, PLEASE DO NOT EDIT.
 #
-# Generated on 2025-01-21T13:16:50Z by kres 3075de9.
+# Generated on 2025-10-03T12:46:35Z by kres bc281a9.
 
 # common variables
 
@@ -25,7 +25,7 @@ SOURCE_DATE_EPOCH := $(shell git log $(INITIAL_COMMIT_SHA) --pretty=%ct)
 
 # sync bldr image with pkgfile
 
-BLDR_RELEASE := v0.3.2
+BLDR_RELEASE := v0.5.4
 BLDR_IMAGE := ghcr.io/siderolabs/bldr:$(BLDR_RELEASE)
 BLDR := docker run --rm --user $(shell id -u):$(shell id -g) --volume $(PWD):/src --entrypoint=/bldr $(BLDR_IMAGE) --root=/src
 
@@ -36,24 +36,30 @@ PLATFORM ?= linux/amd64,linux/arm64
 PROGRESS ?= auto
 PUSH ?= false
 CI_ARGS ?=
+BUILD_ARGS = --build-arg=SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH)
+BUILD_ARGS += --build-arg=TAG="$(TAG)"
+BUILD_ARGS += --build-arg=PKGS="$(PKGS)"
+BUILD_ARGS += --build-arg=PKGS_PREFIX="$(PKGS_PREFIX)"
+BUILD_ARGS += --build-arg=TOOLS="$(TOOLS)"
+BUILD_ARGS += --build-arg=TOOLS_PREFIX="$(TOOLS_PREFIX)"
 COMMON_ARGS = --file=Pkgfile
 COMMON_ARGS += --provenance=false
 COMMON_ARGS += --progress=$(PROGRESS)
 COMMON_ARGS += --platform=$(PLATFORM)
-COMMON_ARGS += --build-arg=SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH)
-COMMON_ARGS += --build-arg=TAG="$(TAG)"
-COMMON_ARGS += --build-arg=PKGS="$(PKGS)"
-COMMON_ARGS += --build-arg=PKGS_PREFIX="$(PKGS_PREFIX)"
+COMMON_ARGS += $(BUILD_ARGS)
 
 # extra variables
 
 EXTENSIONS_IMAGE_REF ?= $(REGISTRY_AND_USERNAME)/extensions:$(TAG)
-PKGS ?= v1.10.0-alpha.0-31-g5da83db
+PKGS ?= v1.12.0-alpha.0-34-gddfd7af
 PKGS_PREFIX ?= ghcr.io/siderolabs
+TOOLS ?= v1.12.0-alpha.0-12-g2c56d7a
+TOOLS_PREFIX ?= ghcr.io/siderolabs
 
 # targets defines all the available targets
 
-TARGETS = amdgpu
+TARGETS = amazon-ena
+TARGETS += amdgpu
 TARGETS += amd-ucode
 TARGETS += binfmt-misc
 TARGETS += bnx2-bnx2x
@@ -62,14 +68,17 @@ TARGETS += chelsio-drivers
 TARGETS += chelsio-firmware
 TARGETS += cloudflared
 TARGETS += crun
+TARGETS += ctr
 TARGETS += drbd
 TARGETS += dvb-cx23885
+TARGETS += dvb-m88ds3103
 TARGETS += ecr-credential-provider
 TARGETS += fuse3
 TARGETS += gasket-driver
 TARGETS += glibc
 TARGETS += gvisor
 TARGETS += gvisor-debug
+TARGETS += hailort
 TARGETS += hello-world-service
 TARGETS += i915
 TARGETS += intel-ice-firmware
@@ -80,6 +89,11 @@ TARGETS += lldpd
 TARGETS += mdadm
 TARGETS += mei
 TARGETS += metal-agent
+TARGETS += nebula
+TARGETS += netbird
+TARGETS += newt
+TARGETS += nfsd
+TARGETS += nfsrahead
 TARGETS += multipath-tools
 TARGETS += nut-client
 TARGETS += nvidia-container-toolkit-lts
@@ -89,20 +103,28 @@ TARGETS += nvidia-fabricmanager-production
 TARGETS += nvidia-open-gpu-kernel-modules-lts
 TARGETS += nvidia-open-gpu-kernel-modules-production
 TARGETS += nvme-cli
+TARGETS += panfrost
 TARGETS += qemu-guest-agent
 TARGETS += qlogic-firmware
 TARGETS += realtek-firmware
+TARGETS += revpi-firmware
 TARGETS += spin
 TARGETS += stargz-snapshotter
 TARGETS += tailscale
+TARGETS += tenstorrent
 TARGETS += thunderbolt
 TARGETS += uinput
 TARGETS += usb-modem-drivers
+TARGETS += usb-audio-drivers
 TARGETS += util-linux-tools
 TARGETS += v4l-uvc-drivers
+TARGETS += vc4
 TARGETS += vmtoolsd-guest-agent
 TARGETS += wasmedge
+TARGETS += xdma-driver
 TARGETS += xen-guest-agent
+TARGETS += youki
+TARGETS += zerotier
 TARGETS += zfs
 NONFREE_TARGETS = nonfree-kmod-nvidia-lts
 NONFREE_TARGETS += nonfree-kmod-nvidia-production
@@ -186,23 +208,37 @@ reproducibility-test-local-%:  ## Builds the specified target defined in the Pkg
 	@diffoscope $(ARTIFACTS)/build-a $(ARTIFACTS)/build-b
 	@rm -rf $(ARTIFACTS)/build-a $(ARTIFACTS)/build-b
 
+$(ARTIFACTS)/bldr: $(ARTIFACTS)  ## Downloads bldr binary.
+	@curl -sSL https://github.com/siderolabs/bldr/releases/download/$(BLDR_RELEASE)/bldr-$(OPERATING_SYSTEM)-$(GOARCH) -o $(ARTIFACTS)/bldr
+	@chmod +x $(ARTIFACTS)/bldr
+
+.PHONY: update-checksums
+update-checksums: $(ARTIFACTS)/bldr  ## Updates the checksums in the Pkgfile/vars.yaml based on the changed version variables.
+	@git diff -U0 | $(ARTIFACTS)/bldr update
+
 nonfree: $(NONFREE_TARGETS)  ## Builds all nonfree targets defined.
 
 .PHONY: $(TARGETS) $(NONFREE_TARGETS)
 $(TARGETS) $(NONFREE_TARGETS): $(ARTIFACTS)/bldr
 	@$(MAKE) docker-$@ TARGET_ARGS="--tag=$(REGISTRY)/$(USERNAME)/$@:$(shell $(ARTIFACTS)/bldr eval --target $@ --build-arg TAG=$(TAG) '{{.VERSION}}' 2>/dev/null) --push=$(PUSH)"
 
-$(ARTIFACTS)/bldr: $(ARTIFACTS)  ## Downloads bldr binary.
-	@curl -sSL https://github.com/siderolabs/bldr/releases/download/$(BLDR_RELEASE)/bldr-$(OPERATING_SYSTEM)-$(GOARCH) -o $(ARTIFACTS)/bldr
-	@chmod +x $(ARTIFACTS)/bldr
-
-.PHONY: deps.png
-deps.png:  ## Generates a dependency graph of the Pkgfile.
-	@$(BLDR) graph | dot -Tpng -o deps.png
+.PHONY: deps.svg
+deps.svg:  ## Generates a dependency graph of the Pkgfile.
+	@rm -f deps.png
+	@$(BLDR) graph $(BUILD_ARGS) | dot -Tsvg -o deps.svg
 
 .PHONY: extensions
 extensions: internal/extensions/descriptions.yaml
 	@$(MAKE) docker-$@ TARGET_ARGS="--tag=$(EXTENSIONS_IMAGE_REF) --push=$(PUSH)"
+
+.PHONY: extensions-catalog
+extensions-catalog: $(ARTIFACTS)/bldr
+	@$(ARTIFACTS)/bldr dump --build-arg TAG=VERSION --template hack/catalog.template > $(ARTIFACTS)/catalog.md 2>/dev/null
+	@lead='^<!-- ### BEGIN GENERATED CONTENT -->$$'; tail='^<!-- ### END GENERATED CONTENT -->$$'; sed -i -e "/$$lead/,/$$tail/{ /$$lead/{p; r $(ARTIFACTS)/catalog.md" -e "}; /$$tail/p; d }" README.md
+
+.PHONY: check-dirty
+check-dirty:
+	@if test -n "`git status --porcelain`"; then echo "Source tree is dirty"; git status; git diff; exit 1 ; fi
 
 .PHONY: extensions-metadata
 extensions-metadata: $(ARTIFACTS)/bldr
@@ -230,6 +266,10 @@ sign-images:
 	  cosign verify $$image --certificate-identity-regexp '@siderolabs\.com$$' --certificate-oidc-issuer https://accounts.google.com || \
 	    cosign sign --yes $$image; \
 	done
+
+.PHONY: grype-scan
+grype-scan:
+	@$(MAKE) local-$@ DEST=$(ARTIFACTS)/grype-scan PLATFORM=linux/amd64
 
 .PHONY: rekres
 rekres:

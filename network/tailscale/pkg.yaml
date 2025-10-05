@@ -1,31 +1,31 @@
 name: tailscale
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
   - stage: base
 steps:
   - env:
-      GOPATH: /go
+      GOPATH: /tmp/go
   - cachePaths:
       - /.cache/go-build
-      - /go/pkg
+      - /tmp/go/pkg
     sources:
       - url: https://github.com/tailscale/tailscale/archive/refs/tags/v{{ .TAILSCALE_VERSION }}.tar.gz
         destination: tailscale.tar.gz
-        sha256: dbc25cc241bb233f183475f003d5508af7b45add1ca548b35a6a6fea91fb91af
-        sha512: 1286971554f15c601ee36050cbe361170de2ea4955fc8dde01a4a231f966a1049b9d85d2854637077c1900d4e67ef15352250e412f9e13b2d1cb6b34b2dce05a
+        sha256: {{ .TAILSCALE_SHA256 }}
+        sha512: {{ .TAILSCALE_SHA512 }}
+  - network: default
     prepare:
-      - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
-
       - |
         mkdir tailscale dist
         tar -xzvf tailscale.tar.gz --strip-components=1 -C tailscale
+      - |
+        cd tailscale
+        go mod download
+  - network: none
     build:
       - |
-        export PATH=${PATH}:${TOOLCHAIN}/go/bin
-
-        go build \
+        CGO_ENABLED=0 go build \
           -C tailscale \
           -o ../dist \
         	-ldflags "-X tailscale.com/version.shortStamp={{ .TAILSCALE_VERSION }} \
@@ -40,6 +40,13 @@ steps:
       - |
         mkdir -p /rootfs/usr/local/etc/containers
         cp /pkg/tailscale.yaml /rootfs/usr/local/etc/containers/
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/tailscale.spdx.json
+      version: {{ .TAILSCALE_VERSION }}
+      cpes:
+        - cpe:2.3:a:tailscale:tailscale:{{ .TAILSCALE_VERSION }}:*:*:*:*:*:*:*
+      licenses:
+        - BSD-3-Clause
     test:
       - |
         mkdir -p /extensions-validator-rootfs

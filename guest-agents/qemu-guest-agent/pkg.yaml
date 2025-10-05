@@ -1,31 +1,21 @@
 name: qemu-guest-agent
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
   - stage: base
-  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/openssl:{{ .BUILD_ARG_PKGS }}"
   - stage: pcre2
   - stage: glib
 steps:
   - sources:
       - url: https://download.qemu.org/qemu-{{ .QEMU_VERSION }}.tar.xz
         destination: qemu.tar.xz
-        sha256: f859f0bc65e1f533d040bbe8c92bcfecee5af2c921a6687c652fb44d089bd894
-        sha512: f92548623e4e31400c823a2d78417a8a4ecfccb07f3ee4883e2f2ad33054539d2a37d076dbc64df42c6c86c08fa7c2c975cd6e823aa14d5f20cef83348006813
+        sha256: {{ .QEMU_SHA256 }}
+        sha512: {{ .QEMU_SHA512 }}
     prepare:
-      - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
       - |
         tar -xf qemu.tar.xz --strip-components=1
         rm qemu.tar.xz
       - |
-        mkdir -p /usr/bin
-
-        ln -s /toolchain/bin/env /usr/bin/env
-        ln -s /toolchain/bin/python3 /toolchain/bin/python
-
-        pip3 install ninja
-
         extra_args=( )
 
         if [[ "${ARCH}" == aarch64 ]]; then
@@ -72,6 +62,14 @@ steps:
         cp -r /rootfs/ /extensions-validator-rootfs/rootfs
         cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
         /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/qemu-guest-agent.spdx.json
+      version: {{ .QEMU_VERSION }}
+      cpes:
+        - cpe:2.3:a:qemu:qemu:{{ .QEMU_VERSION }}:*:*:*:*:*:*:*
+      licenses:
+        - GPL-2.0
+        - LGPL-2.1
 finalize:
   - from: /rootfs
     to: /rootfs

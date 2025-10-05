@@ -1,19 +1,15 @@
 name: nut-client
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
   - stage: base
-  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/openssl:{{ .BUILD_ARG_PKGS }}"
-  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/util-linux:{{ .BUILD_ARG_PKGS }}"
 steps:
   - sources:
       - url: https://github.com/networkupstools/nut/releases/download/v{{ .NUT_VERSION }}/nut-{{ .NUT_VERSION }}.tar.gz
         destination: nut.tar.gz
-        sha256: e4b4b0cbe7dd39ba9097be7f7d787bb2fffbe35df64dff53b5fe393d659c597d
-        sha512: b6f8f22318e4a4fcb8073a63132b1cb083952c665191b82a7d6765a61b859575a4b0c2ba84ed17cfb8c88d34179876d64520dd2f75f02fe8707b406da2c0821c
+        sha256: {{ .NUT_SHA256 }}
+        sha512: {{ .NUT_SHA512 }}
     prepare:
-      - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
       - |
         tar -xf nut.tar.gz --strip-components=1
       - |
@@ -21,12 +17,6 @@ steps:
         patch -p1 < /pkg/patches/replace_system.patch
       - |
         mkdir -p /usr/bin
-        ln -sf /toolchain/bin/env /usr/bin/env
-
-        # Create symlinks for files used when building.
-        ln -s /toolchain/bin/pkg-config /usr/bin/pkg-config
-        ln -s /toolchain/bin/file /usr/bin/file
-
         autoreconf -if
 
         export PKG_CONFIG_PATH=/usr/lib/pkgconfig
@@ -89,6 +79,12 @@ steps:
         cp -r /rootfs/ /extensions-validator-rootfs/rootfs
         cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
         /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/nut-client.spdx.json
+      version: {{ .NUT_VERSION }}
+      licenses:
+        - GPL-2.0
+        - GPL-3.0
 finalize:
   - from: /rootfs
     to: /rootfs

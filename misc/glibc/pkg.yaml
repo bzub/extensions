@@ -3,6 +3,7 @@ variant: scratch
 shell: /bin/bash
 install:
   - build-base
+  - gcc-14
   - bash
   - gawk
   - bison
@@ -10,14 +11,15 @@ install:
 dependencies:
   - image: cgr.dev/chainguard/wolfi-base@{{ .WOLFI_BASE_REF }}
 steps:
-  - sources:
-      - url: https://src.fedoraproject.org/lookaside/pkgs/glibc/glibc-{{ .GLIBC_VERSION }}-9-g132a72f93c.tar.xz/sha512/f88ffb4ab47104640c88504ca2619cdca0795565173daf98a37d624333e14ab96699f662597fe51ba94a274c4cc7001bd2c8cc29fd5df012733298049e533bf4/glibc-{{ .VERSION }}-9-g132a72f93c.tar.xz
+  - env:
+      CC: gcc-14
+      CXX: g++-14
+    sources:
+      - url: https://src.fedoraproject.org/lookaside/pkgs/glibc/glibc-{{ .GLIBC_VERSION }}-8-g1e0e33e1b1.tar.xz/sha512/449e3d4f6b59bfde2175c5d1be71447b084e0b12b176518b65fd9b0ac8430766b25416a173fe3efd47462bc1719d59a051e7eed9544e0fba9165dd86f69ee0b9/glibc-{{ .GLIBC_VERSION }}-8-g1e0e33e1b1.tar.xz
         destination: glibc.tar.xz
-        sha256: 49cd4eed693ffa9010d81e1c75ab33a278a7cbb404a01564b2e287e04ec3d4d3
-        sha512: f88ffb4ab47104640c88504ca2619cdca0795565173daf98a37d624333e14ab96699f662597fe51ba94a274c4cc7001bd2c8cc29fd5df012733298049e533bf4
+        sha256: {{ .GLIBC_SHA256 }}
+        sha512: {{ .GLIBC_SHA512 }}
     prepare:
-      - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
       - |
         tar -xf glibc.tar.xz --strip-components=1
 
@@ -52,14 +54,21 @@ steps:
 
         cp /pkg/ld.so.conf /rootfs/usr/local/glibc/etc/ld.so.conf
 
-        mkdir -p /rootfs/lib64 /rootfs/sbin
-        ln -s /usr/local/glibc/usr/lib/ld-linux-x86-64.so.2 /rootfs/lib64/ld-linux-x86-64.so.2
-        ln -s /usr/local/glibc/usr/sbin/ldconfig /rootfs/sbin/ldconfig
+        mkdir -p /rootfs/usr/lib /rootfs/usr/bin
+        ln -s /usr/local/glibc/usr/lib/ld-linux-x86-64.so.2 /rootfs/usr/lib/ld-linux-x86-64.so.2
+        ln -s /usr/local/glibc/usr/sbin/ldconfig /rootfs/usr/bin/ldconfig
 
         # cleanup
         rm -rf /rootfs/usr/local/glibc/include
         rm -rf /rootfs/usr/local/glibc/share
         rm -rf /rootfs/usr/local/glibc/var
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/glibc.spdx.json
+      version: {{ .GLIBC_VERSION }}
+      cpes:
+        - cpe:2.3:a:gnu:glibc:{{ .GLIBC_VERSION }}:*:*:*:*:*:*:*
+      licenses:
+        - LGPL-2.1-or-later
 finalize:
   - from: /rootfs
     to: /rootfs

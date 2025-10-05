@@ -2,6 +2,7 @@
 kind: pkgfile.Build
 spec:
   targets:
+    - amazon-ena
     - amdgpu
     - amd-ucode
     - binfmt-misc
@@ -11,14 +12,17 @@ spec:
     - chelsio-firmware
     - cloudflared
     - crun
+    - ctr
     - drbd
     - dvb-cx23885
+    - dvb-m88ds3103
     - ecr-credential-provider
     - fuse3
     - gasket-driver
     - glibc
     - gvisor
     - gvisor-debug
+    - hailort
     - hello-world-service
     - i915
     - intel-ice-firmware
@@ -29,6 +33,11 @@ spec:
     - mdadm
     - mei
     - metal-agent
+    - nebula
+    - netbird
+    - newt
+    - nfsd
+    - nfsrahead
     - multipath-tools
     - nut-client
     - nvidia-container-toolkit-lts
@@ -38,20 +47,28 @@ spec:
     - nvidia-open-gpu-kernel-modules-lts
     - nvidia-open-gpu-kernel-modules-production
     - nvme-cli
+    - panfrost
     - qemu-guest-agent
     - qlogic-firmware
     - realtek-firmware
+    - revpi-firmware
     - spin
     - stargz-snapshotter
     - tailscale
+    - tenstorrent
     - thunderbolt
     - uinput
     - usb-modem-drivers
+    - usb-audio-drivers
     - util-linux-tools
     - v4l-uvc-drivers
+    - vc4
     - vmtoolsd-guest-agent
     - wasmedge
+    - xdma-driver
     - xen-guest-agent
+    - youki
+    - zerotier
     - zfs
   additionalTargets:
     nonfree:
@@ -62,13 +79,19 @@ spec:
     - TAG
     - PKGS
     - PKGS_PREFIX
+    - TOOLS
+    - TOOLS_PREFIX
   makefile:
     extraVariables:
       - name: EXTENSIONS_IMAGE_REF
         defaultValue: $(REGISTRY_AND_USERNAME)/extensions:$(TAG)
       - name: PKGS
-        defaultValue: v1.10.0-alpha.0-31-g5da83db
+        defaultValue: v1.12.0-alpha.0-34-gddfd7af
       - name: PKGS_PREFIX
+        defaultValue: ghcr.io/siderolabs
+      - name: TOOLS
+        defaultValue: v1.12.0-alpha.0-12-g2c56d7a
+      - name: TOOLS_PREFIX
         defaultValue: ghcr.io/siderolabs
   useBldrPkgTagResolver: true
 ---
@@ -81,9 +104,11 @@ spec:
 kind: auto.CustomSteps
 spec:
   steps:
-    - name: check-dirty
-      toplevel: true
     - name: extensions
+      toplevel: true
+    - name: extensions-catalog
+      toplevel: true
+    - name: check-dirty
       toplevel: true
     - name: extensions-metadata
       toplevel: true
@@ -93,7 +118,7 @@ spec:
       toplevel: true
     - name: sign-images
       toplevel: true
-    - name: extensions-info
+    - name: grype-scan
       toplevel: true
 ---
 kind: custom.Step
@@ -112,6 +137,35 @@ spec:
     condition: except-pull-request
     environment:
       PUSH: true
+---
+kind: custom.Step
+name: extensions-catalog
+spec:
+  makefile:
+    enabled: true
+    phony: true
+    depends:
+      - $(ARTIFACTS)/bldr
+    script:
+      - |
+        @$(ARTIFACTS)/bldr dump --build-arg TAG=VERSION --template hack/catalog.template > $(ARTIFACTS)/catalog.md 2>/dev/null
+        @lead='^<!-- ### BEGIN GENERATED CONTENT -->$$'; tail='^<!-- ### END GENERATED CONTENT -->$$'; sed -i -e "/$$lead/,/$$tail/{ /$$lead/{p; r $(ARTIFACTS)/catalog.md" -e "}; /$$tail/p; d }" README.md
+  ghaction:
+    enabled: true
+    condition: on-pull-request
+---
+kind: custom.Step
+name: check-dirty
+spec:
+  makefile:
+    enabled: true
+    phony: true
+    script:
+      - |
+        @if test -n "`git status --porcelain`"; then echo "Source tree is dirty"; git status; git diff; exit 1 ; fi
+  ghaction:
+    enabled: true
+    condition: on-pull-request
 ---
 kind: custom.Step
 name: extensions-metadata
@@ -169,6 +223,35 @@ spec:
           cosign verify $$image --certificate-identity-regexp '@siderolabs\.com$$' --certificate-oidc-issuer https://accounts.google.com || \
             cosign sign --yes $$image; \
         done
+---
+kind: custom.Step
+name: grype-scan
+spec:
+  makefile:
+    enabled: true
+    phony: true
+    script:
+      - "@$(MAKE) local-$@ DEST=$(ARTIFACTS)/grype-scan PLATFORM=linux/amd64"
+      # - "@$(MAKE) target-$@ TARGET_ARGS=\"--build-arg=GRYPE_EXTRA_ARGS='--fail-on=negligible'\""
+  ghaction:
+    enabled: true
+    cronOnly: true
+    jobs:
+      - name: grype-scan
+        runnerGroup: pkgs
+        triggerLabels:
+        - integration/grype
+        crons:
+          - '30 7 * * *'
+        artifacts:
+          enabled: true
+          skipArtifactDownload: true
+          additional:
+            - name: results
+              paths:
+                - _out/grype-scan/**
+              retentionDays: "180"
+              always: true
 ---
 kind: common.Renovate
 spec:

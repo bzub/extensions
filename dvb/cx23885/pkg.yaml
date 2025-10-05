@@ -1,6 +1,6 @@
 name: dvb-cx23885
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
   - stage: base
   - stage: v4l-uvc-drivers
@@ -11,36 +11,34 @@ steps:
   - sources:
       - url: https://github.com/OpenELEC/dvb-firmware/archive/refs/tags/{{ .LINUX_DVB_FIRMWARE }}.tar.gz
         destination: dvb-firmware.tar.gz
-        sha256: cef3ce537d213e020af794cecf9de207e2882c375ceda39102eb6fa2580bad8d
-        sha512: 2372dba98083c76865f5f0f8101b1160888e03cdbe911dd08621e7b6f38e8a25ae5d56eefc21728bf65fd09ea613b53606df4021d3972b0bc9d2bd8b6cbe20a1
+        sha256: {{ .LINUX_DVB_FIRMWARE_SHA256 }}
+        sha512: {{ .LINUX_DVB_FIRMWARE_SHA512 }}
     prepare:
       - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
-
         mkdir -p /rootfs
     # {{ if eq .ARCH "x86_64" }} This in fact is YAML comment, but Go templating instruction is evaluated by bldr
       - |
         tar xf dvb-firmware.tar.gz
     install:
       - |
-        export KERNELRELEASE=$(find /lib/modules -type d -name "*-talos" -exec basename {} \+)
+        export KERNELRELEASE=$(find /usr/lib/modules -type d -name "*-talos" -exec basename {} \+)
 
         mkdir -p /rootfs
 
-        xargs -a /pkg/files/modules.txt -I {} install -D /lib/modules/${KERNELRELEASE}/{} /rootfs/lib/modules/${KERNELRELEASE}/{}
-        depmod -b /rootfs ${KERNELRELEASE}
+        xargs -a /pkg/files/modules.txt -I {} install -D /usr/lib/modules/${KERNELRELEASE}/{} /rootfs/usr/lib/modules/${KERNELRELEASE}/{}
+        depmod -b /rootfs/usr ${KERNELRELEASE}
       - |
         mkdir -p /rootfs/usr/local/lib/modprobe.d
         cp /pkg/files/dvb.conf /rootfs/usr/local/lib/modprobe.d/dvb-cx23885.conf
       - |
-        mkdir -p /rootfs/lib/firmware
-        cp dvb-firmware-{{ .LINUX_DVB_FIRMWARE }}/firmware/dvb-demod-si2168-02.fw /rootfs/lib/firmware
-        cp dvb-firmware-{{ .LINUX_DVB_FIRMWARE }}/firmware/dvb-demod-si2168-b40-01.fw /rootfs/lib/firmware
-        cp dvb-firmware-{{ .LINUX_DVB_FIRMWARE }}/firmware/v4l-cx23885-avcore-01.fw /rootfs/lib/firmware
+        mkdir -p /rootfs/usr/lib/firmware
+        cp dvb-firmware-{{ .LINUX_DVB_FIRMWARE }}/firmware/dvb-demod-si2168-02.fw /rootfs/usr/lib/firmware
+        cp dvb-firmware-{{ .LINUX_DVB_FIRMWARE }}/firmware/dvb-demod-si2168-b40-01.fw /rootfs/usr/lib/firmware
+        cp dvb-firmware-{{ .LINUX_DVB_FIRMWARE }}/firmware/v4l-cx23885-avcore-01.fw /rootfs/usr/lib/firmware
     test:
       - |
         # https://www.kernel.org/doc/html/v4.15/admin-guide/module-signing.html#signed-modules-and-stripping
-        find /rootfs/lib/modules -name '*.ko' -exec grep -FL '~Module signature appended~' {} \+
+        find /rootfs/usr/lib/modules -name '*.ko' -exec grep -FL '~Module signature appended~' {} \+
       - |
         mkdir -p /extensions-validator-rootfs
         cp -r /rootfs/ /extensions-validator-rootfs/rootfs

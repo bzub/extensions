@@ -1,31 +1,32 @@
 name: ecr-credential-provider
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
   - stage: base
 steps:
   - sources:
-      - url: https://github.com/kubernetes/cloud-provider-aws/archive/refs/tags/{{ .VERSION }}.tar.gz
+      - url: https://github.com/kubernetes/cloud-provider-aws/archive/refs/tags/{{ .CLOUD_PROVIDER_AWS_VERSION }}.tar.gz
         destination: cloud-provider-aws.tar.gz
-        sha256: 0bd75a18faab15dae7a603e1d6b57691953f1b6427f6eaa4c14e9fbfc1a75348
-        sha512: e85b0c4a79f6c087147a5868520693f7cb98a471d5497dcda27a6e341e719868f5308ccf8d9781e601ff1b52f332a0447033a096c929e768553e937e154db25e
+        sha256: {{ .CLOUD_PROVIDER_AWS_SHA256 }}
+        sha512: {{ .CLOUD_PROVIDER_AWS_SHA512 }}
     env:
-      GOPATH: /go
+      GOPATH: /tmp/go
     cachePaths:
       - /.cache/go-build
-      - /go/pkg
+      - /tmp/go/pkg
+  - network: default
     prepare:
-      - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
       - |
         mkdir -p ${GOPATH}/src/k8s.io/cloud-provider-aws
 
         tar -xzf cloud-provider-aws.tar.gz --strip-components=1 -C ${GOPATH}/src/k8s.io/cloud-provider-aws
+      - |
+        cd ${GOPATH}/src/k8s.io/cloud-provider-aws
+        go mod download
+  - network: none
     build:
       - |
-        export PATH=${PATH}:${TOOLCHAIN}/go/bin
-
-        go build \
+        CGO_ENABLED=0 go build \
           -C ${GOPATH}/src/k8s.io/cloud-provider-aws \
           -o ./dist/ecr-credential-provider \
           -ldflags "-s -w \
@@ -42,6 +43,11 @@ steps:
         cp -r /rootfs/ /extensions-validator-rootfs/rootfs
         cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
         /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/ecr-credential-provider.spdx.json
+      version: {{ .CLOUD_PROVIDER_AWS_VERSION }}
+      licenses:
+        - Apache-2.0
 finalize:
   - from: /rootfs
     to: /rootfs

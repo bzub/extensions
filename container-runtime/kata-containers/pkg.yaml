@@ -1,42 +1,44 @@
 name: kata-containers
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
   - stage: base
 steps:
   - sources:
     # {{ if eq .ARCH "aarch64" }} This in fact is YAML comment, but Go templating instruction is evaluated by bldr
-      - url: https://github.com/kata-containers/kata-containers/releases/download/{{ .KATA_CONTAINERS_VERSION }}/kata-static-{{ .KATA_CONTAINERS_VERSION }}-arm64.tar.xz
-        destination: kata-static.tar.xz
-        sha256: 5437f0162e08154260c58642f433d8a9154fb6d443ca2c1ddee675154ec88c9d
-        sha512: 000cf484bd9a9a8500fcbed024b69c4337457bc3e054f6bc2bf6ca6258d8cd78c403d540729a97361ea2f0ca49de13d37078ec0e3ca6c6330003474bf5090e77
+      - url: https://github.com/kata-containers/kata-containers/releases/download/{{ .KATA_CONTAINERS_VERSION }}/kata-static-{{ .KATA_CONTAINERS_VERSION }}-arm64.tar.zst
+        destination: kata-static.tar.zst
+        sha256: {{ .KATA_CONTAINERS_STATIC_ARM64_SHA256 }}
+        sha512: {{ .KATA_CONTAINERS_STATIC_ARM64_SHA512 }}
     # {{ else }} This in fact is YAML comment, but Go templating instruction is evaluated by bldr
-      - url: https://github.com/kata-containers/kata-containers/releases/download/{{ .KATA_CONTAINERS_VERSION }}/kata-static-{{ .KATA_CONTAINERS_VERSION }}-amd64.tar.xz
-        destination: kata-static.tar.xz
-        sha256: 72e29c7b3ee325e0049bf694bbb843ed07c3eb0a05d89c2b3a1635241e4bafe8
-        sha512: b7ff426d4ea44053b7028bae32b3aa2a94d000c5e2bdd361ac0f144988f52e86d61eccc73bf3a6fc888b5d6c6f8db44c9a8ca0fa651bb27a7ab95818144d3b9e
+      - url: https://github.com/kata-containers/kata-containers/releases/download/{{ .KATA_CONTAINERS_VERSION }}/kata-static-{{ .KATA_CONTAINERS_VERSION }}-amd64.tar.zst
+        destination: kata-static.tar.zst
+        sha256: {{ .KATA_CONTAINERS_STATIC_AMD64_SHA256 }}
+        sha512: {{ .KATA_CONTAINERS_STATIC_AMD64_SHA512 }}
     # {{ end }} This in fact is YAML comment, but Go templating instruction is evaluated by bldr
       - url: https://github.com/kata-containers/kata-containers/archive/refs/tags/{{ .KATA_CONTAINERS_VERSION }}.tar.gz
         destination: kata-containers.tar.gz
-        sha256: 6567498577888f29d186d14629e7e987e8afc49ab988c72e0bc80918fe99295a
-        sha512: 54b989b1db27e56266d1e40b18d3c4f353a3f876dad358afecbba7fb7e1238da1f0856c73f627cbb24e36176f784e2a809bb1b7a990ad21644b06e7b43d64a68
+        sha256: {{ .KATA_CONTAINERS_SHA256 }}
+        sha512: {{ .KATA_CONTAINERS_SHA512 }}
     env:
-      GOPATH: /go
+      GOPATH: /tmp/go
     cachePaths:
       - /.cache/go-build
-      - /go/pkg
+      - /tmp/go/pkg
+  - network: default
     prepare:
       - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
-      - |
         mkdir -p kata-static
-        tar xf kata-static.tar.xz -C kata-static
+        tar xf kata-static.tar.zst -C kata-static
       - |
         mkdir -p ${GOPATH}/src/github.com/kata-containers
         tar -xzf kata-containers.tar.gz --strip-components=1 -C ${GOPATH}/src/github.com/kata-containers
+      - |
+        cd ${GOPATH}/src/github.com/kata-containers/src/runtime
+        go mod download
+  - network: none
     build:
       - |
-        export PATH=${PATH}:${TOOLCHAIN}/go/bin
         cd ${GOPATH}/src/github.com/kata-containers
         PREFIX=/usr/local make -C src/runtime SKIP_GO_VERSION_CHECK=y containerd-shim-v2
     install:
@@ -45,16 +47,10 @@ steps:
 
         mkdir -p /rootfs/usr/local/{bin,libexec,share/kata-containers}
 
-        cp ./opt/kata/bin/cloud-hypervisor /rootfs/usr/local/bin/cloud-hypervisor
-        chmod +x /rootfs/usr/local/bin/cloud-hypervisor
+        cp ./opt/kata/bin/cloud-hypervisor /rootfs/usr/local/bin/
+        cp ./opt/kata/libexec/virtiofsd /rootfs/usr/local/libexec/
 
-        cp ./opt/kata/bin/cloud-hypervisor /rootfs/usr/local/bin/cloud-hypervisor
-        chmod +x /rootfs/usr/local/bin/cloud-hypervisor
-
-        cp ./opt/kata/libexec/virtiofsd /rootfs/usr/local/libexec/virtiofsd
-        chmod +x /rootfs/usr/local/libexec/virtiofsd
-
-        cp ./opt/kata/share/kata-containers/kata-containers-initrd.img /rootfs/usr/local/share/kata-containers/kata-containers-initrd.img
+        cp ./opt/kata/share/kata-containers/kata-containers.img /rootfs/usr/local/share/kata-containers/kata-containers.img
         cp ./opt/kata/share/kata-containers/vmlinux.container /rootfs/usr/local/share/kata-containers/vmlinux.container
       - |
         cd ${GOPATH}/src/github.com/kata-containers/src/runtime
@@ -64,13 +60,20 @@ steps:
         cp /pkg/10-kata-containers.part /rootfs/etc/cri/conf.d/10-kata-containers.part
 
         mkdir -p /rootfs/usr/local/share/kata-containers
-        cp /pkg/configuration.toml /rootfs/usr/local/share/kata-containers/configuration.toml
+        cp /pkg/configuration.toml /rootfs/usr/local/share/kata-containers/
     test:
       - |
         mkdir -p /extensions-validator-rootfs
         cp -r /rootfs/ /extensions-validator-rootfs/rootfs
         cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
         /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/kata-containers.spdx.json
+      version: {{ .KATA_CONTAINERS_VERSION }}
+      cpes:
+        - cpe:2.3:a:katacontainers:kata_containers:{{ .KATA_CONTAINERS_VERSION }}:*:*:*:*:*:*:*
+      licenses:
+        - Apache-2.0
 finalize:
   - from: /rootfs
     to: /rootfs

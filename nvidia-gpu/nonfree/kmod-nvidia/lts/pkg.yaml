@@ -1,23 +1,23 @@
 name: nonfree-kmod-nvidia-lts
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
  - stage: base
 # The pkgs version for a particular release of Talos as defined in
 # https://github.com/siderolabs/talos/blob/<talos version>/pkg/machinery/gendata/data/pkgs
  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/nonfree-kmod-nvidia-lts-pkg:{{ .BUILD_ARG_PKGS }}"
 steps:
-  - prepare:
-      - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
   - install:
       - |
-        mkdir -p /rootfs/lib/modules \
+        mkdir -p /rootfs/usr/lib/modules \
           /rootfs/usr/local/lib/modprobe.d
 
         cp /pkg/files/nvidia.conf /rootfs/usr/local/lib/modprobe.d/nvidia.conf
 
-        cp -R /lib/modules/* /rootfs/lib/modules
+        cp -R /usr/lib/modules/* /rootfs/usr/lib/modules
+
+        mkdir -p /rootfs/usr/local/share/spdx
+        cp -R /usr/share/spdx/kmod-nvidia-lts.spdx.json /rootfs/usr/local/share/spdx
     test:
       - |
         mkdir -p /extensions-validator-rootfs

@@ -1,21 +1,16 @@
 name: hello-world-service
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
   - stage: base
 steps:
   - env:
-      GOPATH: /go
+      GOPATH: /tmp/go
     cachePaths:
       - /.cache/go-build
-      - /go/pkg
-    prepare:
-      - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
+      - /tmp/go/pkg
     build:
       - |
-        export PATH=${PATH}:${TOOLCHAIN}/go/bin
-
         cd /pkg/src
         CGO_ENABLED=0 go build -o ./hello-world .
     install:

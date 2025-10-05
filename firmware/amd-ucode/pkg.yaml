@@ -1,17 +1,14 @@
 name: amd-ucode
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
   - stage: base
   - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/linux-firmware:{{ .BUILD_ARG_PKGS }}"
 steps:
-  - prepare:
+  - install:
       - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
-    install:
-      - |
-        mkdir -p /rootfs/lib/firmware
-        cp -R -p /lib/firmware/amd-ucode /rootfs/lib/firmware
+        mkdir -p /rootfs/usr/lib/firmware
+        cp -R -p /usr/lib/firmware/amd-ucode /rootfs/usr/lib/firmware
     test:
       - |
         mkdir -p /extensions-validator-rootfs
