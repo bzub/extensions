@@ -1,0 +1,51 @@
+name: util-linux-tools
+variant: scratch
+shell: /bin/bash
+dependencies:
+  - stage: base
+steps:
+  - sources:
+      - url: https://www.kernel.org/pub/linux/utils/util-linux/v{{ regexReplaceAll ".\\d+$" .UTIL_LINUX_VERSION "${1}" }}/util-linux-{{  regexReplaceAll "\\.0$" .UTIL_LINUX_VERSION "${1}" }}.tar.xz
+        destination: util-linux.tar.xz
+        sha256: {{ .UTIL_LINUX_SHA256 }}
+        sha512: {{ .UTIL_LINUX_SHA512 }}
+    prepare:
+      - |
+        tar -xJf util-linux.tar.xz --strip-components=1
+
+        mkdir build
+        cd build
+        ../configure \
+            --prefix=/usr/local \
+            --without-python \
+            --disable-bash-completion \
+            --disable-asciidoc \
+            --disable-makeinstall-chown \
+            --without-systemd \
+            --without-systemdsystemunitdir \
+            --disable-all-programs \
+            --enable-libmount \
+            --enable-libblkid \
+            --enable-nsenter \
+            --enable-fstrim \
+    build:
+      - |
+        cd build
+        make install-strip -j $(nproc)
+    install:
+      - |
+        cd build
+        mkdir /rootfs
+        make install DESTDIR=/rootfs
+        rm -rf /rootfs/usr/local/{include,lib,share}
+    test:
+      - |
+        mkdir -p /extensions-validator-rootfs
+        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
+        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
+        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+finalize:
+  - from: /rootfs
+    to: /rootfs
+  - from: /pkg/manifest.yaml
+    to: /

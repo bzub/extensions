@@ -1,0 +1,59 @@
+name: stargz-snapshotter
+depends:
+  - service: cri
+container:
+  environment:
+  - PATH=/usr/local/bin
+  entrypoint: ./containerd-stargz-grpc
+  args:
+    - --address=/var/run/containerd-stargz-grpc/containerd-stargz-grpc.sock
+    - --root=/var/lib/containerd/io.containerd.snapshotter.v1.stargz
+    - --log-level=debug
+  security:
+    rootfsPropagation: shared
+  mounts:
+    - source: /etc/ssl
+      destination: /etc/ssl
+      type: bind
+      options:
+        - bind
+        - ro
+    - source: /var
+      destination: /var
+      type: bind
+      options:
+        - rshared
+        - rbind
+        - rw
+    - source: /usr/local/etc/containerd-stargz-grpc
+      destination: /etc/containerd-stargz-grpc
+      type: bind
+      options:
+        - bind
+        - ro
+    - source: /lib
+      destination: /lib
+      type: bind
+      options:
+        - bind
+        - ro
+    - source: /usr/lib
+      destination: /usr/lib
+      type: bind
+      options:
+        - bind
+        - ro
+    - source: /usr/local/bin
+      destination: /usr/local/bin
+      type: bind
+      options:
+        - bind
+        - ro
+    - source: /dev
+      destination: /dev
+      type: bind
+      options:
+        - rshared
+        - rbind
+        - rw
+restart: always

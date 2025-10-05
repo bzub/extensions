@@ -1,0 +1,54 @@
+name: nebula
+variant: scratch
+shell: /bin/bash
+dependencies:
+  - stage: base
+steps:
+  - env:
+      GOPATH: /tmp/go
+  - cachePaths:
+      - /.cache/go-build
+      - /tmp/go/pkg
+    sources:
+      - url: https://github.com/slackhq/nebula/archive/refs/tags/v{{ .NEBULA_VERSION }}.tar.gz
+        destination: nebula.tar.gz
+        sha256: {{ .NEBULA_SHA256 }}
+        sha512: {{ .NEBULA_SHA512 }}
+  - network: default
+    prepare:
+      - |
+        mkdir nebula
+        tar -xzvf nebula.tar.gz --strip-components=1 -C nebula
+      - |
+        cd nebula
+        go mod download
+  - network: none
+    build:
+      - |
+        cd nebula
+        make bin
+    install:
+      - |
+        mkdir -p /rootfs/usr/local/lib/containers/nebula/usr/local/bin/
+        cp -pr nebula/nebula /rootfs/usr/local/lib/containers/nebula/usr/local/bin
+      - |
+        mkdir -p /rootfs/usr/local/etc/containers
+        cp /pkg/nebula.yaml /rootfs/usr/local/etc/containers/
+    test:
+      - |
+        mkdir -p /extensions-validator-rootfs
+        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
+        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
+        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/nebula.spdx.json
+      version: {{ .NEBULA_VERSION }}
+      cpes:
+        - cpe:2.3:a:slack:nebula:{{ .NEBULA_VERSION }}:*:*:*:*:*:*:*
+      licenses:
+        - MIT
+finalize:
+  - from: /rootfs
+    to: /rootfs
+  - from: /pkg/manifest.yaml
+    to: /

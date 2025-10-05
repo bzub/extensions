@@ -1,0 +1,40 @@
+name: libnvme
+variant: scratch
+shell: /bin/bash
+dependencies:
+  - stage: base
+  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/libjson-c:{{ .BUILD_ARG_PKGS }}"
+steps:
+  - sources:
+      - url: https://github.com/linux-nvme/libnvme/archive/refs/tags/{{ .LIBNVME_VERSION }}.tar.gz
+        destination: libnvme.tar.gz
+        sha256: {{ .LIBNVME_SHA256 }}
+        sha512: {{ .LIBNVME_SHA512 }}
+    prepare:
+      - |
+        tar xf libnvme.tar.gz --strip-components=1
+
+        export PKG_CONFIG_PATH=/usr/lib/pkgconfig
+
+        patch -p1 < /pkg/patches/rm-internal-include.patch
+
+        meson setup \
+          -Db_lto=true \
+          -Djson-c=enabled \
+          -Dpython=disabled \
+          -Dsysconfdir=/etc \
+          .build
+    build:
+      - |
+        meson compile -C .build
+    install:
+      - |
+        DESTDIR=/rootfs meson install -C .build
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/libnvme.spdx.json
+      version: {{ .LIBNVME_VERSION }}
+      licenses:
+        - LGPL-2.1
+finalize:
+  - from: /rootfs
+    to: /rootfs

@@ -1,0 +1,2 @@
+VERSION: "{{ .CLOUD_PROVIDER_AWS_VERSION }}"
+TIER: "extra"

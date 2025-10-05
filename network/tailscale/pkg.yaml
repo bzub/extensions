@@ -1,0 +1,60 @@
+name: tailscale
+variant: scratch
+shell: /bin/bash
+dependencies:
+  - stage: base
+steps:
+  - env:
+      GOPATH: /tmp/go
+  - cachePaths:
+      - /.cache/go-build
+      - /tmp/go/pkg
+    sources:
+      - url: https://github.com/tailscale/tailscale/archive/refs/tags/v{{ .TAILSCALE_VERSION }}.tar.gz
+        destination: tailscale.tar.gz
+        sha256: {{ .TAILSCALE_SHA256 }}
+        sha512: {{ .TAILSCALE_SHA512 }}
+  - network: default
+    prepare:
+      - |
+        mkdir tailscale dist
+        tar -xzvf tailscale.tar.gz --strip-components=1 -C tailscale
+      - |
+        cd tailscale
+        go mod download
+  - network: none
+    build:
+      - |
+        CGO_ENABLED=0 go build \
+          -C tailscale \
+          -o ../dist \
+        	-ldflags "-X tailscale.com/version.shortStamp={{ .TAILSCALE_VERSION }} \
+         					  -X tailscale.com/version.longStamp={{ .TAILSCALE_VERSION }}-TalosLinux" \
+         tailscale.com/cmd/{tailscale,tailscaled,containerboot}
+    install:
+      - |
+        mkdir -p /rootfs/usr/local/lib/containers/tailscale/usr/local/bin/
+        cp -pr dist/tailscale /rootfs/usr/local/lib/containers/tailscale/usr/local/bin
+        cp -pr dist/tailscaled /rootfs/usr/local/lib/containers/tailscale/usr/local/bin
+        cp -pr dist/containerboot /rootfs/usr/local/lib/containers/tailscale/usr/local/bin
+      - |
+        mkdir -p /rootfs/usr/local/etc/containers
+        cp /pkg/tailscale.yaml /rootfs/usr/local/etc/containers/
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/tailscale.spdx.json
+      version: {{ .TAILSCALE_VERSION }}
+      cpes:
+        - cpe:2.3:a:tailscale:tailscale:{{ .TAILSCALE_VERSION }}:*:*:*:*:*:*:*
+      licenses:
+        - BSD-3-Clause
+    test:
+      - |
+        mkdir -p /extensions-validator-rootfs
+        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
+        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
+        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+finalize:
+  - from: /rootfs
+    to: /rootfs
+  - from: /pkg/manifest.yaml
+    to: /

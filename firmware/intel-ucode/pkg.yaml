@@ -1,23 +1,30 @@
 name: intel-ucode
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
   - stage: base
 steps:
   - sources:
       - url: https://github.com/intel/Intel-Linux-Processor-Microcode-Data-Files/archive/refs/tags/microcode-{{ .INTEL_UCODE_VERSION }}.tar.gz
         destination: intel-ucode.tar.gz
-        sha256: 8d14a914815f56c27b1f41be0fd699d1afcfdbc05432056427e455100798975e
-        sha512: d86bee1269d31d3028f0d2b7d4886795b96d8f1f9d5dbd5149c2dd4cec3b0319fd869f8138f283e2135ecb0bb6387cfd3c2ef1f597b4194a250ac4f2df7f15a4
+        sha256: {{ .INTEL_UCODE_SHA256 }}
+        sha512: {{ .INTEL_UCODE_SHA512 }}
     prepare:
-      - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
       - |
         tar -xzf intel-ucode.tar.gz --strip-components=1
     install:
       - |
-        mkdir -p /rootfs/lib/firmware
-        cp -R -p intel-ucode /rootfs/lib/firmware
+        mkdir -p /rootfs/usr/lib/firmware
+        cp -R -p intel-ucode /rootfs/usr/lib/firmware
+    test:
+      - |
+        mkdir -p /extensions-validator-rootfs
+        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
+        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
+        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/intel-ucode.spdx.json
+      version: {{ .INTEL_UCODE_VERSION }}
 finalize:
   - from: /rootfs
     to: /rootfs

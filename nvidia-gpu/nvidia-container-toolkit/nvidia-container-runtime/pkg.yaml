@@ -1,41 +1,34 @@
 name: nvidia-container-runtime
 variant: scratch
 shell: /bin/bash
+install:
+  - build-base
+  - gcc-14
+  - bash
+  - go
+  - patch
 dependencies:
-  - image: ubuntu:{{ .UBUNTU_IMAGE_VERSION }}
+  - image: cgr.dev/chainguard/wolfi-base@{{ .WOLFI_BASE_REF }}
 steps:
   - sources:
-      - url: https://gitlab.com/nvidia/container-toolkit/container-toolkit/-/archive/{{ .CONTAINER_TOOLKIT_VERSION }}/container-toolkit-{{ .CONTAINER_TOOLKIT_VERSION }}.tar.gz
+      - url: https://github.com/NVIDIA/nvidia-container-toolkit/archive/refs/tags/{{ .CONTAINER_TOOLKIT_VERSION }}.tar.gz
         destination: container-toolkit.tar.gz
-        sha256: b57699534414b3c3e2319a70d5532deeb2056bf95af711c5bc08173b50190888
-        sha512: 07bc724afebff63cafeffd9d85bf0411286b31c1e37a94f1884a64aa7c6f1b6dbf1528b0e0e7d5fc25dbc08a619cafdb153a64786f510f515e51c20507af85b2
+        sha256: {{ .CONTAINER_TOOLKIT_SHA256 }}
+        sha512: {{ .CONTAINER_TOOLKIT_SHA512 }}
     env:
-      GOPATH: /go
+      CC: gcc-14
+      CXX: g++-14
       GIT_COMMIT: {{ substr 0 7 .CONTAINER_TOOLKIT_REF }} # build is using short sha
     prepare:
       - |
-
-        chmod 1777 /tmp
-
-        apt update && \
-        apt install -y curl patch build-essential
-
-        # {{ if eq .ARCH "x86_64" }} This in fact is YAML comment, but Go templating instruction is evaluated by bldr
-        curl https://storage.googleapis.com/golang/go{{ .GOLANG_VERSION }}.linux-amd64.tar.gz | tar -C /usr/local -xz
-        # {{ else }} This in fact is YAML comment, but Go templating instruction is evaluated by bldr
-        curl https://storage.googleapis.com/golang/go{{ .GOLANG_VERSION }}.linux-arm64.tar.gz | tar -C /usr/local -xz
-        # {{ end }} This in fact is YAML comment, but Go templating instruction is evaluated by bldr
-
         mkdir -p container-toolkit
         tar -xzf container-toolkit.tar.gz --strip-components=1 -C container-toolkit
-    build:
-      - |
-        export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 
         cd container-toolkit
-
-        patch -p0 < /pkg/patches/nvidia-container-runtime/config.go.patch
-        patch -p0 < /pkg/patches/nvidia-container-toolkit/hook_config.go.patch
+        patch -p0 < /pkg/patches/ldcache_path.patch
+    build:
+      - |
+        cd container-toolkit
 
         make cmds
     install:
@@ -44,15 +37,34 @@ steps:
 
         cd container-toolkit
 
-        cp ./nvidia-container-runtime /rootfs/usr/local/bin/nvidia-container-runtime
-        cp ./nvidia-container-runtime-hook /rootfs/usr/local/bin/nvidia-container-runtime-hook
+        # let's copy all built binaries suffixing them with .real
+        # the wrapper binary will call the real binary with the same name
+        for file in $(find . -maxdepth 1 -type f -executable); do
+          clean_file=$(basename $file)
 
-        chmod +x /rootfs/usr/local/bin/nvidia-container-runtime
-        chmod +x /rootfs/usr/local/bin/nvidia-container-runtime-hook
+          # oci-nvidia-hook is a shell script calling nvidia-container-runtime-hook
+          if [[ $clean_file == "oci-nvidia-hook" ]]; then
+            ln -sv nvidia-container-runtime-hook /rootfs/usr/local/bin/$clean_file
+
+            continue
+          fi
+
+          ln -sv nvidia-container-runtime-wrapper /rootfs/usr/local/bin/$(basename $clean_file)
+          cp $clean_file /rootfs/usr/local/bin/$(basename $clean_file).real
+        done
+      - |
+        mkdir -p /rootfs/etc/cri/conf.d
+        cp /pkg/10-nvidia-container-runtime.part /rootfs/etc/cri/conf.d/10-nvidia-container-runtime.part
+
+        mkdir -p /rootfs/usr/local/etc/nvidia-container-runtime
+        cp /pkg/nvidia-container-runtime.toml /rootfs/usr/local/etc/nvidia-container-runtime/config.toml
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/nvidia-container-runtime.spdx.json
+      version: {{ .CONTAINER_TOOLKIT_VERSION }}
+      cpes:
+        - cpe:2.3:a:nvidia:nvidia_container_toolkit:{{ .CONTAINER_TOOLKIT_VERSION }}:*:*:*:*:*:*:*
+      licenses:
+        - Apache-2.0
 finalize:
   - from: /rootfs
     to: /rootfs
-  - from: /pkg/nvidia-container-runtime.part
-    to: /rootfs/etc/cri/conf.d/nvidia-container-runtime.part
-  - from: /pkg/nvidia-container-runtime.toml
-    to: /rootfs/usr/local/etc/nvidia-container-runtime/config.toml

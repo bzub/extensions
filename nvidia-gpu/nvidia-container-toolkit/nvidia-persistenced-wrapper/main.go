@@ -1,9 +1,12 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 package main
 
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -19,6 +22,7 @@ const (
 )
 
 func main() {
+	// ref: https://docs.nvidia.com/deploy/driver-persistence/index.html
 	// first check if the pid file exists,
 	// then check if the process is running,
 	// if running try to kill it, then start the new process
@@ -28,7 +32,6 @@ func main() {
 		}
 	} else {
 		pid, err := getProcessId()
-
 		if err != nil {
 			log.Fatalf("nvidia-persistenced-wrapper: error reading pid file: %s%v\n", pidFile, err)
 		}
@@ -41,11 +44,7 @@ func main() {
 		}
 	}
 
-	cmd := exec.Command("/usr/local/bin/nvidia-persistenced",
-		[]string{
-			"--no-persistence-mode",
-			"--verbose",
-		}...)
+	cmd := exec.Command("/usr/local/bin/nvidia-persistenced")
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -67,7 +66,7 @@ func main() {
 }
 
 func getProcessId() (int, error) {
-	pidData, err := ioutil.ReadFile(pidFile)
+	pidData, err := os.ReadFile(pidFile)
 	if err != nil {
 		return 0, err
 	}

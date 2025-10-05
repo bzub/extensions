@@ -1,0 +1,45 @@
+name: mdadm
+variant: scratch
+shell: /bin/bash
+dependencies:
+  - stage: base
+  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/systemd-udevd:{{ .BUILD_ARG_PKGS }}"
+steps:
+  - sources:
+      - url: http://www.kernel.org/pub/linux/utils/raid/mdadm/mdadm-{{ .MDADM_VERSION }}.tar.gz
+        destination: mdadm.tar.gz
+        sha256: {{ .MDADM_SHA256 }}
+        sha512: {{ .MDADM_SHA512 }}
+    prepare:
+      - |
+        tar -xzf mdadm.tar.gz --strip-components=1
+      - |
+        patch -p1 < /pkg/patches/mdadm-include-sysmacros.patch
+        patch -p1 < /pkg/patches/no-werror.patch
+        patch -p1 < /pkg/patches/musl-125.patch
+        patch -p1 < /pkg/patches/exit-gracefully-when-md-device-not-found.patch
+    build:
+      - |
+        mkdir -p /run/mdadm
+
+        CXFLAGS=-D_LARGEFILE64_SOURCE \
+        make -j $(nproc) mdadm
+        make -j $(nproc) mdmon
+    install:
+      - |
+        mkdir -p /rootfs/usr/local/sbin /rootfs/usr/lib/udev/rules.d
+        cp mdadm /rootfs/usr/local/sbin/mdadm
+        cp mdmon /rootfs/usr/local/sbin/mdmon
+        cp /pkg/files/udev-md-raid-arrays.rules   /rootfs/usr/lib/udev/rules.d/63-md-raid-arrays.rules
+        cp /pkg/files/udev-md-raid-assembly.rules /rootfs/usr/lib/udev/rules.d/64-md-raid-assembly.rules
+    test:
+      - |
+        mkdir -p /extensions-validator-rootfs
+        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
+        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
+        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+finalize:
+  - from: /rootfs
+    to: /rootfs
+  - from: /pkg/manifest.yaml
+    to: /

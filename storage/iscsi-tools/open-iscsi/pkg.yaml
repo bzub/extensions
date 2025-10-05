@@ -1,64 +1,58 @@
 name: open-iscsi
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
   - stage: base
-  - image: "{{ .PKGS_PREFIX }}/kmod:{{ .PKGS_VERSION }}"
-  - image: "{{ .PKGS_PREFIX }}/openssl:{{ .PKGS_VERSION }}"
-  - image: "{{ .PKGS_PREFIX }}/util-linux:{{ .PKGS_VERSION }}"
-  - stage: open-isns
-    from: /rootfs
 steps:
   - sources:
       - url: https://github.com/open-iscsi/open-iscsi/archive/refs/tags/{{ .OPEN_ISCSI_VERSION }}.tar.gz
         destination: open-iscsi.tar.gz
-        sha256: 9565bdf6b68b223e1e0d455d9a04d7536724a3f5b5a254e9398d06b2a0c6b6d2
-        sha512: 168ce68dc495cc8b2f217ad0373851d681f9274036b8ec562ece513de493adfdbba55f2038518f246f5244f6405102b2e096a9cce15e73fce9654f06790002c1
+        sha256: {{ .OPEN_ISCSI_SHA256 }}
+        sha512: {{ .OPEN_ISCSI_SHA512 }}
+    env:
+      SOURCE_DATE_EPOCH: {{ .BUILD_ARG_SOURCE_DATE_EPOCH }}
     prepare:
       - |
-        mkdir -p /usr/bin \
-            && ln -sf /toolchain/bin/env /usr/bin/env \
-            && ln -sf /toolchain/bin/install /usr/bin/install
-
         tar -xzf open-iscsi.tar.gz --strip-components=1
 
-        # Create symlinks for binaries required by libtoolize.
-        ln -s /toolchain/bin/sed /bin/sed
-        ln -s /toolchain/bin/sed /usr/bin/sed
-        ln -s /toolchain/bin/grep /bin/grep
-
-        # Create symlinks for files used when building.
-        ln -s /toolchain/bin/pkg-config /usr/bin/pkg-config
-        ln -s /toolchain/bin/file /usr/bin/file
-
         patch -p1 < /pkg/patches/musl-fixes.patch
-        patch -p1 < /pkg/patches/add-missing-headers.patch
         patch -p1 < /pkg/patches/dont-use-lib64.patch
         patch -p1 < /pkg/patches/remove-werror.patch
     build:
       - |
         export PKG_CONFIG_PATH=/usr/lib/pkgconfig
 
+        mkdir -p output
+
         LDFLAGS="$LDFLAGS -L/usr/local/lib" \
-        make \
-          prefix=/usr/local \
-          exec_prefix=/usr/local \
-          localstatedir=/var \
-          sysconfdir=/usr/local/etc \
-          mandir=/usr/local/share/man \
-          OPTFLAGS="$CFLAGS -I/usr/local/include -DNO_SYSTEMD"
+        meson setup \
+          -Db_lto=true \
+          -Dno_systemd=true \
+          -Disns=disabled \
+          -Dhomedir=/etc/iscsi \
+          -Dprefix=/usr/local \
+          -Discsi_sbindir=/usr/local/sbin \
+          -Drulesdir=/usr/lib/udev/rules.d \
+          output
+
+        ninja -C output
     install:
       - |
-        mkdir -p /usr/local/etc
-        make prefix=/usr/local exec_prefix=/usr/local/ etcdir=/usr/local/etc DESTDIR=/rootfs install
+        mkdir -p /rootfs/usr/local/etc
+        DESTDIR=/rootfs ninja -C output install
 
         # cleanup
-        rm -rf /rootfs/usr/local/share
-        rm -rf /rootfs/usr/local/include
-        rm -rf /rootfs/usr/local/lib/pkgconfig
-        rm -rf /rootfs/usr/local/etc/iscsi/ifaces
-
-        cp /pkg/files/passwd /rootfs/usr/local/etc/passwd
+        # we generate initiatorname.iscsi on talos side.
+        rm -rf /rootfs/etc
+        rm -rf /rootfs/usr/local/{etc,share,include,pkgconfig}
+        rm -rf /rootfs/var
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/open-iscsi.spdx.json
+      version: {{ .OPEN_ISCSI_VERSION }}
+      cpes:
+        - cpe:2.3:a:open-iscsi_project:open-iscsi:{{ .OPEN_ISCSI_VERSION }}:*:*:*:*:*:*:*
+      licenses:
+        - GPL-2.0
 finalize:
   - from: /rootfs
     to: /rootfs

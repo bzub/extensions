@@ -1,0 +1,39 @@
+
+name: libtirpc
+variant: scratch
+shell: /bin/bash
+install:
+  - build-base
+  - gcc-14
+  - bash
+  - autoconf
+dependencies:
+  - image: cgr.dev/chainguard/wolfi-base@{{ .WOLFI_BASE_REF }}
+steps:
+  - env:
+      CC: gcc-14
+      CXX: g++-14
+    sources:
+      - url: https://src.fedoraproject.org/lookaside/extras/libtirpc/libtirpc-{{ .LIBTIRPC_VERSION | replace "-" "." }}.tar.bz2/sha512/{{ .LIBTIRPC_SHA512 }}/libtirpc-{{ .LIBTIRPC_VERSION | replace "-" "." }}.tar.bz2
+        destination: libtirpc.tar.bz2
+        sha256: {{ .LIBTIRPC_SHA256 }}
+        sha512: {{ .LIBTIRPC_SHA512 }}
+    prepare:
+      - |
+        tar -xf libtirpc.tar.bz2 --strip-components=1
+
+        ./configure \
+          --prefix=/usr/local/glibc \
+          --disable-gssapi
+    build:
+      - |
+        make -j $(nproc)
+    install:
+      - |
+        mkdir -p /rootfs
+
+        make install DESTDIR=/rootfs
+        rm -rf /rootfs/usr/local/share/man
+finalize:
+  - from: /rootfs
+    to: /rootfs

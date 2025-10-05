@@ -1,0 +1,33 @@
+name: metal-agent
+container:
+  entrypoint: ./talos-metal-agent
+  args: []
+  environment:
+    - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  mounts:
+    - source: /system/run/machined/machine.sock
+      destination: /system/run/machined/machine.sock
+      type: bind
+      options:
+        - rshared
+        - rbind
+    - source: /dev
+      destination: /dev
+      type: bind
+      options:
+        - rshared
+        - rbind
+        - rw
+    - source: /etc/ssl/certs
+      destination: /etc/ssl/certs
+      type: bind
+      options:
+        - rbind
+        - ro
+depends:
+  - path: /system/run/machined/machine.sock
+  - path: /etc/ssl/certs
+  - network:
+      - addresses
+restart: always
+logToConsole: true

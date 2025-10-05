@@ -1,0 +1,42 @@
+name: spin
+variant: scratch
+shell: /bin/bash
+dependencies:
+  - stage: base
+steps:
+  - sources:
+    # {{ if eq .ARCH "aarch64" }} This in fact is YAML comment, but Go templating instruction is evaluated by bldr
+      - url: https://github.com/spinkube/containerd-shim-spin/releases/download/{{ .SPIN_VERSION }}/containerd-shim-spin-v2-linux-aarch64.tar.gz
+        destination: containerd-shim-spin.tar.gz
+        sha256: {{ .SPIN_ARM64_SHA256 }}
+        sha512: {{ .SPIN_ARM64_SHA512 }}
+    # {{ else }} This in fact is YAML comment, but Go templating instruction is evaluated by bldr
+      - url: https://github.com/spinkube/containerd-shim-spin/releases/download/{{ .SPIN_VERSION }}/containerd-shim-spin-v2-linux-x86_64.tar.gz
+        destination: containerd-shim-spin.tar.gz
+        sha256: {{ .SPIN_AMD64_SHA256 }}
+        sha512: {{ .SPIN_AMD64_SHA512 }}
+    # {{ end }} This in fact is YAML comment, but Go templating instruction is evaluated by bldr
+    install:
+      - |
+        mkdir -p /rootfs/usr/local/bin
+
+        tar xf containerd-shim-spin.tar.gz -C /rootfs/usr/local/bin
+      - |
+        mkdir -p /rootfs/etc/cri/conf.d
+        cp /pkg/10-spin.part /rootfs/etc/cri/conf.d/10-spin.part
+    test:
+      - |
+        mkdir -p /extensions-validator-rootfs
+        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
+        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
+        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/spin.spdx.json
+      version: {{ .SPIN_VERSION }}
+      licenses:
+        - Apache-2.0
+finalize:
+  - from: /rootfs
+    to: /rootfs
+  - from: /pkg/manifest.yaml
+    to: /

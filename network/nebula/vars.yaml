@@ -1,0 +1,2 @@
+VERSION: "{{ .NEBULA_VERSION }}"
+TIER: "contrib"

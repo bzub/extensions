@@ -1,38 +1,47 @@
 # nut-client extension
 
+## Installation
+
+See [Installing Extensions](https://github.com/siderolabs/extensions#installing-extensions).
+
 ## Usage
 
-Enable the extension in the machine configuration before installing Talos:
+Configure the extension via `ExtensionServiceConfig` document.
+You must replace `upsmonHost`, `upsmonUser` and `upsmonPasswd` to match configuration on your nut server.
+See [`upsd.users`](https://networkupstools.org/docs/man/upsd.users.html) man page for details.
+
+On Talos, `SHUTDOWNCMD` must be `/sbin/poweroff`.
 
 ```yaml
-machine:
-  install:
-    extensions:
-      - image: ghcr.io/siderolabs/nut-client:<VERSION>
+---
+apiVersion: v1alpha1
+kind: ExtensionServiceConfig
+name: nut-client
+configFiles:
+  - content: |-
+        MONITOR ${upsmonHost} 1 ${upsmonUser} ${upsmonPass} secondary
+        SHUTDOWNCMD "/sbin/poweroff"
+    mountPath: /usr/local/etc/nut/upsmon.conf
 ```
 
-Configure the extension via .machine.files 
-You must replace upsmonHost and upsmonPasswd to match configuration on your nut server.  
-See [upsd.users](https://networkupstools.org/docs/man/upsd.users.html) man page for details.
+Then apply the patch to your node's `MachineConfig`:
 
 
-On Talos SHUTDOWNCMD must be `/sbin/poweroff`
+```bash
+$ talosctl patch mc -p @nut-config.yaml
+```
 
-```yaml
-machine:
-  files:
-    - path: /var/etc/nut/upsmon.conf
-      permissions: 0o600
-      op: create
-      content: |-
-        MONITOR ${upsmonHost} 1 remote ${upsmonPasswd} slave
-        SHUTDOWNCMD "/sbin/poweroff"
+You will then be able to verify that it is in place with the following command
 
+```bash
+$ talosctl get extensionserviceconfigs
+NODE     NAMESPACE   TYPE                     ID           VERSION
+mynode   runtime     ExtensionServiceConfig   nut-client   1
 ```
 
 ## Testing
 
-Confirm extension service is running
+Confirm extension service is running:
 
 ```bash
 $ talosctl service ext-nut-client
@@ -50,12 +59,12 @@ EVENTS   [Running]: Started task ext-nut-client (PID 2263) for container ext-nut
          [Waiting]: Waiting for service "containerd" to be "up", service "cri" to be "up", network (1h0m3s ago)
 ```
 
-**CAUTION** this will power off all connected systems.
-
-Trigger a 'Full System Shutdown' on the nut-server
+Trigger a “Full System Shutdown” on the NUT server:
 
 ```bash
-# upsmon -c fsd
+$ upsmon -c fsd
 ```
 
-all connected upsmon clients should perform a full shutdown and power off.
+**CAUTION** ⚠️ This will power off **all** connected systems.
+
+All connected `upsmon` clients should perform a full shutdown and power off.

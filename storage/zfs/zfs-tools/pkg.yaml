@@ -1,0 +1,45 @@
+name: zfs-tools
+variant: scratch
+shell: /bin/bash
+dependencies:
+  - stage: base
+  - stage: libtirpc-zfs
+    from: /rootfs
+  - stage: zlib-zfs
+    from: /rootfs
+steps:
+  - sources:
+      - url: https://github.com/openzfs/zfs/releases/download/zfs-{{ .ZFS_DRIVER_VERSION }}/zfs-{{ .ZFS_DRIVER_VERSION }}.tar.gz
+        destination: zfs.tar.gz
+        sha256: {{ .ZFS_TOOLS_SHA256 }}
+        sha512: {{ .ZFS_TOOLS_SHA512 }}
+    env:
+      ARCH: '{{ if eq .ARCH "aarch64"}}arm64{{ else if eq .ARCH "x86_64" }}x86_64{{ else }}unsupported{{ end }}'
+    prepare:
+      - |
+        tar -xf zfs.tar.gz --strip-components=1
+    build:
+      - |
+        ./configure \
+          --prefix=/usr/local \
+          --with-udevdir=/usr/local/sbin \
+          --with-udevruledir=/usr/lib/udev/rules.d \
+          --with-config=user \
+          --disable-code-coverage \
+          --disable-systemd
+
+        make -j $(nproc)
+    install:
+      - |
+        make install-exec DESTDIR=/rootfs
+        make install-data DESTDIR=/rootfs
+        rm -rf /rootfs/{etc,sbin,usr/{lib/dracut,local/share,share}}
+        # remove the 69-vdev.rules, since it depends on `vdev_id` which is a shell script
+        rm -f /rootfs/usr/lib/udev/rules.d/69-vdev.rules
+        # if this file is present creating a vdev tries to executes it
+        # since talos doesn't have a shell, this would fail
+        # the default shipped file is a no-op, so safe to remove.
+        rm -f /rootfs/usr/local/libexec/zfs/zfs_prepare_disk
+finalize:
+  - from: /rootfs
+    to: /rootfs

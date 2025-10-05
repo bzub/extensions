@@ -1,0 +1,2 @@
+VERSION: "{{ .NVME_CLI_VERSION }}"
+TIER: "contrib"

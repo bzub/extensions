@@ -1,0 +1,18 @@
+name: xen-guest-agent
+container:
+  entrypoint: ./xen-guest-agent
+  # log to stderr
+  args:
+    - -s
+  security:
+    writeableRootfs: false
+    writeableSysfs: true
+  mounts:
+  # xenbus
+  - source: /dev/xen
+    destination: /dev/xen
+    type: bind
+    options:
+      - bind
+      - rw
+restart: always

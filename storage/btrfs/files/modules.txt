@@ -1,0 +1,6 @@
+modules.order
+modules.builtin
+modules.builtin.modinfo
+kernel/crypto/blake2b_generic.ko
+kernel/crypto/xxhash_generic.ko
+kernel/fs/btrfs/btrfs.ko

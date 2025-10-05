@@ -1,38 +1,22 @@
 name: nut-client
 variant: scratch
-shell: /toolchain/bin/bash
+shell: /bin/bash
 dependencies:
   - stage: base
-  - image: "{{ .PKGS_PREFIX }}/openssl:{{ .PKGS_VERSION }}"
-  - image: "{{ .PKGS_PREFIX }}/util-linux:{{ .PKGS_VERSION }}"
 steps:
   - sources:
       - url: https://github.com/networkupstools/nut/releases/download/v{{ .NUT_VERSION }}/nut-{{ .NUT_VERSION }}.tar.gz
         destination: nut.tar.gz
-        sha256: c3e5a708da797b7c70b653d37b1206a000fcb503b85519fe4cdf6353f792bfe5
-        sha512: 3c413ae54088045a713eb80cf1bdda474f41bb3b67c7c0248aa7a0c4d441dce1ff42627a2735273d7e36892d1f2eeb895220cf28af63fec2fa0c7a267f82d577
+        sha256: {{ .NUT_SHA256 }}
+        sha512: {{ .NUT_SHA512 }}
     prepare:
       - |
-        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
-      - |
-        tar -xzf nut.tar.gz --strip-components=1
+        tar -xf nut.tar.gz --strip-components=1
       - |
         # no shell for you
         patch -p1 < /pkg/patches/replace_system.patch
       - |
-        mkdir -p /usr/bin \
-            && ln -sf /toolchain/bin/env /usr/bin/env
-
-        # Create symlinks for binaries required by libtoolize.
-        ln -s /toolchain/bin/sed /bin/sed
-        ln -s /toolchain/bin/grep /bin/grep
-
-        # Create symlinks for files used when building.
-        ln -s /toolchain/bin/pkg-config /usr/bin/pkg-config
-        ln -s /toolchain/bin/file /usr/bin/file
-
-        cp /toolchain/share/automake-1.16/config.guess config.guess
-        cp /toolchain/lib/libstdc++* /lib
+        mkdir -p /usr/bin
         autoreconf -if
 
         export PKG_CONFIG_PATH=/usr/lib/pkgconfig
@@ -44,7 +28,7 @@ steps:
                 --with-drvpath=/usr/local/lib/nut \
                 --with-statepath=/var/run/nut \
                 --with-altpidpath=/var/run/nut \
-                --with-udev-dir=/usr/local/etc/udev \
+                --with-udev-dir=/usr/lib/udev \
                 --with-systemdsystemunitdir=no \
                 --with-systemdshutdowndir=no \
                 --with-systemdtmpfilesdir=no \
@@ -81,21 +65,28 @@ steps:
         # TODO replace /usr/bin/wall with either a wrapper for printk or a
         # Go cmd to log to Talos Events
 
-        # /sbin/init is bind mounted in nut-client.yaml
-        pushd "$containerRoot/sbin"
-        ln -sv ./init poweroff
-        popd
-
         # cleanup
         rm -rf /rootfs/usr/local/bin
         rm -rf /rootfs/usr/local/etc
         rm -rf /rootfs/usr/local/lib/nut
         rm -rf /rootfs/usr/local/sbin
-
+      - |
+        mkdir -p /rootfs/usr/local/etc/containers
+        cp /pkg/nut-client.yaml /rootfs/usr/local/etc/containers/
+    test:
+      - |
+        mkdir -p /extensions-validator-rootfs
+        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
+        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
+        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+    sbom:
+      outputPath: /rootfs/usr/local/share/spdx/nut-client.spdx.json
+      version: {{ .NUT_VERSION }}
+      licenses:
+        - GPL-2.0
+        - GPL-3.0
 finalize:
   - from: /rootfs
     to: /rootfs
   - from: /pkg/manifest.yaml
     to: /
-  - from: /pkg/nut-client.yaml
-    to: /rootfs/usr/local/etc/containers/

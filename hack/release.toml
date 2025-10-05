@@ -6,40 +6,48 @@ github_repo = "siderolabs/extensions"
 match_deps = "^github.com/((talos-systems|siderolabs)/[a-zA-Z0-9-]+)$"
 
 # previous release
-previous = "v1.3.0-alpha.0"
+previous = "v1.11.0"
 
 pre_release = true
 
 preface = """\
-See [Talos Linux documentation](https://www.talos.dev/v1.2/talos-guides/configuration/system-extensions/) for information on using system extensions.
+See [Talos Linux documentation](https://www.talos.dev/v1.11/talos-guides/configuration/system-extensions/) for information on using system extensions.
 """
 
 [notes]
 
-    [notes.tpu]
-        title = "Coral.ai TPU gasket driver"
-        description = """\
-Extensions now publish the gasket driver for [Coral.ai](https://coral.ai/) PCIe TPU modules.
-"""
-
-    [notes.drbd]
-        title = "Linbit DRDB driver"
-        description = """\
-Extensions now publish the [DRBD driver](https://linbit.com/drbd/)
-"""
-
     [notes.updates]
         title = "Component Updates"
         description = """\
-* Gvisor: 20220919.0
-* Linux firmware: 20220913
-* NVIDIA container-toolkit: v1.11.0
-* NVIDIA libnvidia-container: v1.11.0
-* nvidia-container-toolkit system extension: v1.11.0
-* Open iSCSI: 2.1.7
-* Open iSNS: 0.102
-* iscsi-tools system extension: v0.1.2
+NVIDIA LTS: 580.82.07
+NVIDIA Production: 570.195.03
+crun: 1.24
+gvisor: 20250820.0
+ecr-credential-provider: 1.34.0
+kata-containers: 3.21.0
+spin: 0.21.0
+stargz-snapshotter: 0.17.0
+youki: 0.5.5
+lldpd: 1.0.20
+nebula: 1.9.6
+netbird: 0.58.2
+newt: 1.5.0
+tailscale: 1.88.3
+zerotier: 1.16.0
+drbd: 9.2.15
+fuse3: 3.17.4
+nut-client: 2.8.4
+talos-vmtoolsd: 1.4.0
+hailort: 4.23.0
+zfs: 2.4.0-rc2
 """
 
-
 [make_deps]
+
+    [make_deps.tools]
+        variable = "TOOLS"
+        repository = "github.com/siderolabs/tools"
+
+    [make_deps.pkgs]
+        variable = "PKGS"
+        repository = "github.com/siderolabs/pkgs"

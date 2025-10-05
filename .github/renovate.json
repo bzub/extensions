@@ -1,81 +1,103 @@
 {
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "description": "THIS FILE WAS AUTOMATICALLY GENERATED, PLEASE DO NOT EDIT.",
+    "prHeader": "Update Request | Renovate Bot",
     "extends": [
+        ":dependencyDashboard",
+        ":gitSignOff",
         ":semanticCommitScopeDisabled",
         "schedule:earlyMondays"
     ],
-    "regexManagers": [
+    "customManagers": [
         {
-            "fileMatch": [
-                "vars.yaml"
+            "customType": "regex",
+            "versioningTemplate": "{{#if versioning}}{{versioning}}{{else}}semver{{/if}}",
+            "managerFilePatterns": [
+                "/Pkgfile/"
             ],
             "matchStrings": [
-                "# renovate: datasource=(?<datasource>.*?)(?:\\s+extractVersion=(?<extractVersion>.+?))?(?:\\s+versioning=(?<versioning>.+?))?\\s+depName=(?<depName>.+?)?\\s(?:.*_(?:version|VERSION):\\s+(?<currentValue>.*))?(?:\\s.*_(?:ref|REF):\\s+(?<currentDigest>.*))?"
-            ],
-            "versioningTemplate": "{{#if versioning}}{{versioning}}{{else}}semver{{/if}}"
+                "# renovate: datasource=(?<datasource>.*?)(?:\\s+extractVersion=(?<extractVersion>.+?))?(?:\\s+versioning=(?<versioning>.+?))?\\s+depName=(?<depName>.+?)?\\s(?:.*_(?:version|VERSION):\\s+(?<currentValue>.*))?(?:(\\s)?.*_(?:ref|REF):\\s+(?<currentDigest>.*))?"
+            ]
         },
         {
-            "fileMatch": [
-                "Pkgfile"
+            "customType": "regex",
+            "datasourceTemplate": "github-tags",
+            "depNameTemplate": "siderolabs/bldr",
+            "versioningTemplate": "semver",
+            "managerFilePatterns": [
+                "/Pkgfile/"
             ],
             "matchStrings": [
-                "(?<depName>ghcr.io\\/siderolabs\\/bldr):(?<currentValue>v.*-frontend)"
-            ],
-            "datasourceTemplate": "docker",
-            "versioningTemplate": "semver"
+                "ghcr.io\\/siderolabs\\/bldr:(?<currentValue>v.*)"
+            ]
         },
         {
-            "fileMatch": [
-                "Makefile"
+            "customType": "regex",
+            "versioningTemplate": "{{#if versioning}}{{versioning}}{{else}}semver{{/if}}",
+            "managerFilePatterns": [
+                "/vars.yaml/"
             ],
             "matchStrings": [
-                "BLDR_RELEASE\\s+\\?=\\s+(?<currentValue>.*)\\n"
-            ],
-            "datasourceTemplate": "github-releases",
-            "depNameTemplate": "siderolabs/bldr"
+                "# renovate: datasource=(?<datasource>.*?)(?:\\s+extractVersion=(?<extractVersion>.+?))?(?:\\s+versioning=(?<versioning>.+?))?\\s+depName=(?<depName>.+?)?\\s(?:.*_(?:version|VERSION):\\s+(?<currentValue>.*))?(?:(\\s)?.*_(?:ref|REF):\\s+(?<currentDigest>.*))?"
+            ]
         }
     ],
     "packageRules": [
         {
-            "matchPackagePatterns": [
-                "*"
-            ],
-            "matchDatasources": [
-                "docker"
-            ],
-            "groupName": "container images"
+            "groupName": "dependencies",
+            "matchUpdateTypes": [
+                "major",
+                "minor",
+                "patch",
+                "pin",
+                "digest"
+            ]
         },
         {
-            "matchPackagePatterns": [
-                "*"
-            ],
-            "matchDatasources": [
-                "go",
-                "golang-version"
-            ],
-            "groupName": "go packages"
+            "enabled": false,
+            "matchFileNames": [
+                "Dockerfile"
+            ]
         },
         {
-            "matchPackagePatterns": [
-                "*"
-            ],
-            "matchDatasources": [
-                "npm"
-            ],
-            "groupName": "node packages"
+            "enabled": false,
+            "matchFileNames": [
+                ".github/workflows/*.yaml"
+            ]
         },
         {
-            "matchPackagePatterns": [
-                "*"
-            ],
-            "matchDatasources": [
-                "git-refs",
-                "git-tags",
-                "github-tags",
-                "github-releases"
-            ],
-            "groupName": "releases"
+            "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.?(?<patch>\\d+)?$",
+            "matchPackageNames": [
+                "nvidia/open-gpu-kernel-modules",
+                "open-iscsi/open-isns",
+                "containers/crun",
+                "git://git.kernel.org/pub/scm/libs/libcap/libcap.git",
+                "git://sourceware.org/git/elfutils.git",
+                "git://git.kernel.org/pub/scm/utils/mdadm/mdadm.git",
+                "linux-nvme/libnvme",
+                "linux-nvme/nvme-cli"
+            ]
+        },
+        {
+            "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.?(?<patch>[0-9]{1,3})?$",
+            "matchPackageNames": [
+                "https://sourceware.org/git/glibc.git"
+            ]
+        },
+        {
+            "versioning": "regex:^(?<major>\\d{4})(?<minor>\\d{2})(?<patch>\\d{2})\\.?(?<build>\\d+)?$",
+            "matchPackageNames": [
+                "google/gvisor",
+                "intel/Intel-Linux-Processor-Microcode-Data-Files",
+                "cloudflare/cloudflared"
+            ]
+        },
+        {
+            "versioning": "regex:^(?<major>\\d+)-(?<minor>\\d+)-?(?<patch>\\d+)?$",
+            "matchPackageNames": [
+                "git://linux-nfs.org/~steved/libtirpc"
+            ]
         }
     ],
-    "dependencyDashboard": true
+    "separateMajorMinor": false
 }

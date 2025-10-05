@@ -1,15 +1,12 @@
 # NVIDIA Container toolkit extension
 
+
+## Installation
+
+See [Installing Extensions](https://github.com/siderolabs/extensions#installing-extensions).
+
+
 ## Usage
-
-Enable the extension in the machine configuration before installing Talos:
-
-```yaml
-machine:
-  install:
-    extensions:
-      - image: ghcr.io/siderolabs/nvidia-container-toolkit:<VERSION>
-```
 
 The following NVIDIA modules needs to be loaded, so add this to the talos config:
 
@@ -52,7 +49,7 @@ Install the NVIDIA device plugin:
 ```bash
 helm repo add nvdp https://nvidia.github.io/k8s-device-plugin
 helm repo update
-helm install nvidia-device-plugin nvdp/nvidia-device-plugin --version=0.11.0 --set=runtimeClassName=nvidia
+helm install nvidia-device-plugin nvdp/nvidia-device-plugin --version=0.14.1 --set=runtimeClassName=nvidia
 ```
 
 Apply the following manifest to run CUDA pod via nvidia runtime:

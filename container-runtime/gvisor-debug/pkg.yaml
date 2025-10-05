@@ -1,0 +1,22 @@
+name: gvisor-debug
+variant: scratch
+shell: /bin/bash
+dependencies:
+  - stage: base
+steps:
+  - install:
+      - |
+        mkdir -p /rootfs/etc/cri/conf.d
+        cp /pkg/11-gvisor-debug.part /rootfs/etc/cri/conf.d/11-gvisor-debug.part
+        cp /pkg/runsc.toml /rootfs/etc/cri/conf.d/runsc.toml
+    test:
+      - |
+        mkdir -p /extensions-validator-rootfs
+        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
+        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
+        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+finalize:
+  - from: /pkg/manifest.yaml
+    to: /
+  - from: /rootfs
+    to: /rootfs

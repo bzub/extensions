@@ -1,0 +1,25 @@
+name: realtek-firmware
+variant: scratch
+shell: /bin/bash
+dependencies:
+  - stage: base
+  - image: "{{ .BUILD_ARG_PKGS_PREFIX }}/linux-firmware:{{ .BUILD_ARG_PKGS }}"
+steps:
+  - install:
+      - |
+        mkdir -p /rootfs/usr/lib/firmware
+        cp -R -p /usr/lib/firmware/rtl_bt /rootfs/usr/lib/firmware
+        cp -R -p /usr/lib/firmware/rtl_nic /rootfs/usr/lib/firmware
+        cp -R -p /usr/lib/firmware/rtlwifi /rootfs/usr/lib/firmware
+        cp -R -p /usr/lib/firmware/rtw88 /rootfs/usr/lib/firmware
+    test:
+      - |
+        mkdir -p /extensions-validator-rootfs
+        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
+        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
+        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+finalize:
+  - from: /rootfs
+    to: /rootfs
+  - from: /pkg/manifest.yaml
+    to: /
